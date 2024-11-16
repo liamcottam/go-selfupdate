@@ -8,24 +8,19 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/kr/binarydist"
+	"github.com/sanbornm/go-selfupdate/selfupdate"
 )
 
 var version, genDir string
 
-type current struct {
-	Version string
-	Sha256  []byte
-}
-
 func generateSha256(path string) []byte {
 	h := sha256.New()
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -59,14 +54,14 @@ func newGzReader(r io.ReadCloser) io.ReadCloser {
 	return g
 }
 
-func createUpdate(path string, platform string) {
-	c := current{Version: version, Sha256: generateSha256(path)}
+func createUpdate(path string, platform string, disablePatchGeneration bool) {
+	c := selfupdate.VersionInfo{Version: version, Sha256: generateSha256(path)}
 
-	b, err := json.MarshalIndent(c, "", "    ")
+	b, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		fmt.Println("error:", err)
 	}
-	err = ioutil.WriteFile(filepath.Join(genDir, platform+".json"), b, 0755)
+	err = os.WriteFile(filepath.Join(genDir, platform+".json"), b, 0755)
 	if err != nil {
 		panic(err)
 	}
@@ -75,21 +70,28 @@ func createUpdate(path string, platform string) {
 
 	var buf bytes.Buffer
 	w := gzip.NewWriter(&buf)
-	f, err := ioutil.ReadFile(path)
+	f, err := os.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
 	w.Write(f)
 	w.Close() // You must close this first to flush the bytes to the buffer.
-	err = ioutil.WriteFile(filepath.Join(genDir, version, platform+".gz"), buf.Bytes(), 0755)
+	err = os.WriteFile(filepath.Join(genDir, version, platform+".gz"), buf.Bytes(), 0755)
+	if err != nil {
+		panic(err)
+	}
 
-	files, err := ioutil.ReadDir(genDir)
+	if disablePatchGeneration {
+		return
+	}
+
+	files, err := os.ReadDir(genDir)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	for _, file := range files {
-		if file.IsDir() == false {
+		if !file.IsDir() {
 			continue
 		}
 		if file.Name() == version {
@@ -120,7 +122,7 @@ func createUpdate(path string, platform string) {
 		if err := binarydist.Diff(ar, br, patch); err != nil {
 			panic(err)
 		}
-		ioutil.WriteFile(filepath.Join(genDir, file.Name(), version, platform), patch.Bytes(), 0755)
+		os.WriteFile(filepath.Join(genDir, file.Name(), version, platform), patch.Bytes(), 0755)
 	}
 }
 
@@ -137,6 +139,7 @@ func createBuildDir() {
 
 func main() {
 	outputDirFlag := flag.String("o", "public", "Output directory for writing updates")
+	disableUpdate := flag.Bool("x", false, "Disable update generation")
 
 	var defaultPlatform string
 	goos := os.Getenv("GOOS")
@@ -170,14 +173,14 @@ func main() {
 	}
 
 	if fi.IsDir() {
-		files, err := ioutil.ReadDir(appPath)
+		files, err := os.ReadDir(appPath)
 		if err == nil {
 			for _, file := range files {
-				createUpdate(filepath.Join(appPath, file.Name()), file.Name())
+				createUpdate(filepath.Join(appPath, file.Name()), file.Name(), *disableUpdate)
 			}
 			os.Exit(0)
 		}
 	}
 
-	createUpdate(appPath, platform)
+	createUpdate(appPath, platform, *disableUpdate)
 }

@@ -32,6 +32,11 @@ var (
 	defaultHTTPRequester = HTTPRequester{}
 )
 
+type VersionInfo struct {
+	Version string `json:"version"`
+	Sha256  []byte `json:"sha256"`
+}
+
 // Updater is the configuration and runtime data for doing an update.
 //
 // Note that ApiURL, BinURL and DiffURL should have the same value if all files are available at the same location.
@@ -50,21 +55,18 @@ var (
 //		go updater.BackgroundRun()
 //	}
 type Updater struct {
-	CurrentVersion string    // Currently running version. `dev` is a special version here and will cause the updater to never update.
-	ApiURL         string    // Base URL for API requests (JSON files).
-	CmdName        string    // Command name is appended to the ApiURL like http://apiurl/CmdName/. This represents one binary.
-	BinURL         string    // Base URL for full binary downloads.
-	DiffURL        string    // Base URL for diff downloads.
-	Dir            string    // Directory to store selfupdate state.
-	ForceCheck     bool      // Check for update regardless of cktime timestamp
-	CheckTime      int       // Time in hours before next check
-	RandomizeTime  int       // Time in hours to randomize with CheckTime
-	Requester      Requester // Optional parameter to override existing HTTP request handler
-	Info           struct {
-		Version string
-		Sha256  []byte
-	}
-	OnSuccessfulUpdate func() // Optional function to run after an update has successfully taken place
+	CurrentVersion     string    // Currently running version. `dev` is a special version here and will cause the updater to never update.
+	ApiURL             string    // Base URL for API requests (JSON files).
+	CmdName            string    // Command name is appended to the ApiURL like http://apiurl/CmdName/. This represents one binary.
+	BinURL             string    // Base URL for full binary downloads.
+	DiffURL            string    // Base URL for diff downloads.
+	Dir                string    // Directory to store selfupdate state.
+	ForceCheck         bool      // Check for update regardless of cktime timestamp
+	CheckTime          int       // Time in hours before next check
+	RandomizeTime      int       // Time in hours to randomize with CheckTime
+	Requester          Requester // Optional parameter to override existing HTTP request handler
+	OnSuccessfulUpdate func()    // Optional function to run after an update has successfully taken place
+	Info               VersionInfo
 }
 
 func (u *Updater) getExecRelativeDir(dir string) string {
